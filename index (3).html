@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>일일 자금 대시보드</title>
+
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+  /* ── 색상: 화이트 메인 + 연한 민트 강조 ── */
+  :root{
+    --bg:#F7FBF9;          /* 배경: 거의 흰색에 가까운 민트 화이트 */
+    --card:#ffffff; --line:#EAF0ED;
+    --ink:#2C3A35;         /* 글자: 차분한 다크 슬레이트 */
+    --muted:#8A9892;
+
+    --side-bg:#ffffff;     /* 사이드바: 흰색 */
+    --side-text:#5C6B64;
+    --side-hover:#F2F8F5;
+    --side-active:#E9F5EF; /* 선택 메뉴: 연한 민트 */
+
+    --mint:#6FC2A4;        /* 메인 강조: 연한 민트 */
+    --mint-soft:#DDF0E8;   /* 연한 채움/막대 배경 */
+    --green:#4FAE8C;       /* 입금/긍정 */
+    --red:#E47C6E;         /* 경고/연체/출금 (절제된 코랄) */
+    --orange:#E8A33D; --amber:#F0C674;
+    --up:#E47C6E;          /* 상승=코랄 */
+    --down:#4FAE8C;        /* 하락=민트 */
+    --btn:#34423D;         /* 버튼: 다크 슬레이트 */
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    background:var(--bg); color:var(--ink); font-size:13px; line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{ display:flex; min-height:100vh; }
+
+  /* ── 사이드바 (흰색) ── */
+  .sidebar{ width:206px; flex:none; background:var(--side-bg); color:var(--side-text);
+    display:flex; flex-direction:column; border-right:1px solid var(--line); }
+  .brand{ display:flex; align-items:center; gap:9px; padding:18px 18px 16px; color:var(--ink); }
+  .brand .logo{ width:30px; height:30px; border-radius:8px; background:linear-gradient(135deg,#8FD3BC,#C7ECDD); flex:none; }
+  .brand b{ font-size:15px; font-weight:700; }
+  .nav{ padding:6px; flex:1; }
+  .nav a{ display:block; padding:9px 12px; border-radius:8px; color:var(--side-text); text-decoration:none; font-size:13px; margin-bottom:2px; }
+  .nav a:hover{ background:var(--side-hover); color:var(--ink); }
+  .nav a.active{ background:var(--side-active); color:var(--ink); font-weight:600; border-left:3px solid var(--mint); }
+  .company{ margin:6px 10px 16px; padding:14px; background:var(--side-hover); border-radius:10px; font-size:11.5px; color:var(--muted); }
+  .company b{ display:block; color:var(--ink); margin-bottom:8px; font-size:12.5px; }
+  .company div{ display:flex; justify-content:space-between; margin-bottom:4px; }
+
+  /* ── 메인 ── */
+  .main{ flex:1; padding:18px 20px 30px; min-width:0; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .topbar .title small{ color:var(--mint); font-weight:600; font-size:12px; }
+  .topbar .title h1{ font-size:21px; font-weight:700; margin-top:2px; }
+  .topbar .tools{ display:flex; gap:8px; align-items:center; }
+  .chip{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:7px 11px; font-size:12px; color:#586660; }
+  .chip b{ color:var(--ink); }
+  .btn-dark{ background:var(--btn); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:600; cursor:pointer; }
+  .btn-dark:hover{ opacity:.9; }
+
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .card h3{ font-size:13.5px; font-weight:700; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
+  .card h3 a{ font-size:11.5px; font-weight:500; color:var(--muted); text-decoration:none; }
+  .unit{ font-size:11px; color:var(--muted); font-weight:400; }
+
+  .kpi{ display:grid; grid-template-columns:repeat(6,1fr); gap:13px; margin-bottom:14px; }
+  .kpi .card{ padding:14px; }
+  .kpi .label{ font-size:12px; color:var(--muted); margin-bottom:8px; }
+  .kpi .val{ font-size:23px; font-weight:700; letter-spacing:-.02em; }
+  .kpi .val .u{ font-size:13px; font-weight:600; color:var(--muted); margin-left:2px; }
+  .kpi .delta{ font-size:11.5px; margin-top:7px; }
+  .up{ color:var(--up); } .down{ color:var(--down); }
+  .tag{ font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; }
+  .tag.ok{ background:var(--mint-soft); color:var(--green); }
+  .tag.warn{ background:#FBEEDD; color:#C77A06; }
+
+  .row-a{ display:grid; grid-template-columns:1.6fr 1.15fr 1.3fr; gap:13px; margin-bottom:14px; }
+  .row-b{ display:grid; grid-template-columns:repeat(4,1fr); gap:13px; margin-bottom:14px; }
+  .row-c{ display:grid; grid-template-columns:1.8fr 1.05fr; gap:13px; }
+
+  .chart-box{ position:relative; height:230px; }
+  .chart-sm{ position:relative; height:150px; }
+
+  .flow-legend{ display:flex; gap:14px; font-size:11px; margin-top:10px; }
+  .flow-legend .col b{ display:block; margin-bottom:4px; }
+  .flow-legend .col span{ display:flex; justify-content:space-between; gap:10px; color:#5d6b64; }
+
+  .alert{ display:flex; gap:9px; padding:9px 0; border-bottom:1px dashed var(--line); }
+  .alert:last-child{ border-bottom:none; }
+  .dot{ width:8px; height:8px; border-radius:50%; margin-top:5px; flex:none; }
+  .alert .t{ font-size:12.5px; font-weight:600; }
+  .alert .s{ font-size:11px; color:var(--muted); margin-top:2px; }
+
+  table{ width:100%; border-collapse:collapse; font-size:11.5px; }
+  th,td{ text-align:left; padding:7px 6px; border-bottom:1px solid var(--line); }
+  th{ color:var(--muted); font-weight:600; }
+  td.num,th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+  .red{ color:var(--red); font-weight:600; }
+
+  .stat{ display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--line); font-size:12px; }
+  .stat:last-child{ border-bottom:none; }
+  .stat .v{ font-weight:700; }
+  .donut-flex{ display:flex; align-items:center; gap:10px; }
+  .donut-flex .big{ font-size:21px; font-weight:700; }
+  .donut-flex .sub{ font-size:11px; color:var(--muted); }
+
+  select{ font-family:inherit; font-size:11px; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
+
+  /* 페이지 전환 */
+  .page{ display:none; }
+  .page.active{ display:block; }
+  .placeholder{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:56px 24px; text-align:center; }
+  .placeholder h2{ font-size:18px; margin-bottom:8px; }
+  .placeholder p{ color:var(--muted); font-size:13px; max-width:420px; margin:0 auto; line-height:1.6; }
+
+  .note{ margin-top:18px; padding:12px 14px; background:#fff; border:1px solid var(--line); border-radius:10px; font-size:12px; color:var(--muted); }
+  .note b.warn{ color:var(--red); }
+
+  @media (max-width:1080px){
+    .sidebar{ display:none; }
+    .kpi{ grid-template-columns:repeat(2,1fr); }
+    .row-a,.row-b,.row-c{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand"><div class="logo"></div><b>자금 대시보드</b></div>
+    <nav class="nav">
+      <a href="#" class="active" data-page="summary">요약 대시보드</a>
+      <a href="#" data-page="cash">현금 현황</a>
+      <a href="#" data-page="in">입금 관리</a>
+      <a href="#" data-page="out">출금 관리</a>
+      <a href="#" data-page="forecast">자금 예측</a>
+      <a href="#" data-page="ar">매출채권(미수금)</a>
+      <a href="#" data-page="ap">매입채무(미지급금)</a>
+      <a href="#" data-page="inv">재고/발주/수입</a>
+      <a href="#" data-page="loan">차입금/금융</a>
+      <a href="#" data-page="tax">세금 관리</a>
+      <a href="#" data-page="alert">이상 징후 알림</a>
+      <a href="#" data-page="report">보고서/안건</a>
+    </nav>
+    <div class="company">
+      <b>회사 개요</b>
+      <div><span>설립일</span><span>2018.03.15</span></div>
+      <div><span>매출규모(24)</span><span>500억원</span></div>
+      <div><span>임직원수</span><span>85명</span></div>
+      <div><span>주요 사업</span><span>육아용품/커머스</span></div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <div class="topbar">
+      <div class="title">
+        <small>GGUMBI</small>
+        <h1 id="pageTitle">일일 자금 대시보드</h1>
+      </div>
+      <div class="tools">
+        <span class="chip">보고일 기준 <b id="reportDate">-</b></span>
+        <span class="chip">데이터 업데이트 <b id="updateTime">-</b></span>
+        <button class="btn-dark" onclick="window.print()">PDF 다운로드</button>
+      </div>
+    </div>
+
+    <div class="page active" data-page="summary">
+    <section class="kpi">
+      <div class="card"><div class="label">총 현금 잔고</div><div class="val">28.4<span class="u">억원</span></div><div class="delta up">전일 대비 -1.6억원 (▲5.3%)</div></div>
+      <div class="card"><div class="label">실제 가용 현금</div><div class="val">19.7<span class="u">억원</span></div><div class="delta up">전일 대비 -1.2억원 (▲5.7%)</div></div>
+      <div class="card"><div class="label">금일 입금액</div><div class="val">3.2<span class="u">억원</span></div><div class="delta up">전일 대비 +0.8억원 (▲33.3%)</div></div>
+      <div class="card"><div class="label">금일 출금액</div><div class="val">4.8<span class="u">억원</span></div><div class="delta up">전일 대비 +1.3억원 (▲37.1%)</div></div>
+      <div class="card"><div class="label">7일 후 예상 잔고</div><div class="val">13.5<span class="u">억원</span></div><div class="delta"><span class="tag ok">안정 구간</span></div></div>
+      <div class="card"><div class="label">30일 후 예상 잔고</div><div class="val">8.2<span class="u">억원</span></div><div class="delta"><span class="tag warn">주의 필요</span></div></div>
+    </section>
+
+    <section class="row-a">
+      <div class="card">
+        <h3>현금 잔고 예측 <span class="unit">단위: 억원</span></h3>
+        <div class="chart-box"><canvas id="chartForecast"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>금일 현금 흐름 <span class="unit">단위: 억원</span></h3>
+        <div class="chart-box" style="height:175px"><canvas id="chartFlow"></canvas></div>
+        <div class="flow-legend">
+          <div class="col"><b style="color:var(--green)">입금 3.2</b>
+            <span>고객 결제<i>2.1</i></span><span>플랫폼 정산<i>0.9</i></span><span>기타 입금<i>0.2</i></span></div>
+          <div class="col"><b style="color:var(--red)">출금 4.8</b>
+            <span>매입대금<i>2.5</i></span><span>급여<i>1.0</i></span><span>세금<i>0.6</i></span><span>대출이자<i>0.3</i></span><span>기타<i>0.4</i></span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>이상 징후 알림 (5) <a href="#">자세히 보기 ›</a></h3>
+        <div class="alert"><span class="dot" style="background:var(--red)"></span><div><div class="t">현금 최저점 8.2억, 안전선(16억) 이하 예상</div><div class="s">발생 예상일 2025.06.28</div></div></div>
+        <div class="alert"><span class="dot" style="background:var(--orange)"></span><div><div class="t">쿠팡 정산금 2.1억원 지연</div><div class="s">정산 예정일 05/27 · 플랫폼 정산 지연</div></div></div>
+        <div class="alert"><span class="dot" style="background:var(--orange)"></span><div><div class="t">90일 초과 미수금 1.4억원 발생</div><div class="s">거래처: (주)OO, (주)XX</div></div></div>
+        <div class="alert"><span class="dot" style="background:var(--orange)"></span><div><div class="t">광고비 전주 대비 32% 증가 (+1,250만원)</div><div class="s">월 예산 초과</div></div></div>
+        <div class="alert"><span class="dot" style="background:var(--amber)"></span><div><div class="t">신제품 금형비 8,300만원 지급 예정 (06/05)</div><div class="s">지급 검토 필요</div></div></div>
+      </div>
+    </section>
+
+    <section class="row-b">
+      <div class="card">
+        <h3>미수금 현황 <span class="unit">단위: 억원</span></h3>
+        <div class="donut-flex">
+          <div class="chart-sm" style="width:130px"><canvas id="chartAR"></canvas></div>
+          <div><div class="big">18.7억</div><div class="sub up">전일 대비 +1.3억</div></div>
+        </div>
+        <table style="margin-top:8px">
+          <tr><th>거래처</th><th class="num">금액</th><th class="num">경과일</th></tr>
+          <tr><td>(주)OO</td><td class="num">7.5억</td><td class="num red">92일</td></tr>
+          <tr><td>(주)XX</td><td class="num">4.2억</td><td class="num">65일</td></tr>
+          <tr><td>(주)YY</td><td class="num">2.1억</td><td class="num">31일</td></tr>
+          <tr><td>(주)ZZ</td><td class="num">1.8억</td><td class="num">28일</td></tr>
+          <tr><td>(주)AA</td><td class="num">1.5억</td><td class="num">15일</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>미지급금 현황 <span class="unit">단위: 억원</span></h3>
+        <div class="donut-flex">
+          <div class="chart-sm" style="width:130px"><canvas id="chartAP"></canvas></div>
+          <div><div class="big">25.3억</div><div class="sub up">전일 대비 +2.4억</div></div>
+        </div>
+        <table style="margin-top:8px">
+          <tr><th>지급예정</th><th>거래처</th><th class="num">금액</th></tr>
+          <tr><td>05/23</td><td>(주)BBB</td><td class="num">1.2억</td></tr>
+          <tr><td>05/24</td><td>(주)CCC</td><td class="num">0.9억</td></tr>
+          <tr><td>05/25</td><td>금형업체</td><td class="num">0.83억</td></tr>
+          <tr><td>05/27</td><td>(주)DDD</td><td class="num">0.6억</td></tr>
+          <tr><td>05/28</td><td>세무서</td><td class="num">0.5억</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>재고/발주/수입 현황 <span class="unit">단위: 억원</span></h3>
+        <div class="stat"><span>총 재고</span><span class="v">72.4억</span></div>
+        <div class="stat"><span>저회전 재고(90일↑)</span><span class="v red">11.8억 (16.3%)</span></div>
+        <div class="stat"><span>발주 예정(30일 내)</span><span class="v">28.5억</span></div>
+        <div class="stat"><span>입고 예정(30일 내)</span><span class="v">31.2억</span></div>
+        <div class="stat"><span>수입 결제 예정(30일 내)</span><span class="v">18.7억</span></div>
+        <div style="margin-top:8px;font-size:11px;color:var(--muted)">신제품 개발 · 금형비 지급(06/05) 8,300만원 / 초도 발주(06/10) 1.8억원</div>
+      </div>
+
+      <div class="card">
+        <h3>차입금 / 세금 현황 <span class="unit">단위: 억원</span></h3>
+        <div class="stat"><span>총 차입금</span><span class="v">42.0억</span></div>
+        <div class="stat"><span>이번 달 이자</span><span class="v">0.7억</span></div>
+        <div class="stat"><span>사용 가능 한도</span><span class="v">18.5억</span></div>
+        <div class="stat"><span>30일 내 만기</span><span class="v red">5.0억</span></div>
+        <div class="stat" style="margin-top:6px"><span>세금 예정 합계</span><span class="v">4.9억</span></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">부가세(07/25) 3.0억 · 원천세 0.4억 · 법인세 중간예납(08/31) 1.5억</div>
+      </div>
+    </section>
+
+    <section class="row-c">
+      <div class="card">
+        <h3>오늘 결정/검토가 필요한 안건</h3>
+        <table>
+          <tr><th>구분</th><th>안건</th><th class="num">금액</th><th>우선순위</th><th>검토 의견</th><th>결정</th></tr>
+          <tr><td>지급 승인</td><td>신제품 금형비 지급</td><td class="num">8,300만원</td><td class="red">상</td><td>지급/보류/분할</td>
+            <td><select><option>선택</option><option>지급</option><option>보류</option><option>분할</option></select></td></tr>
+          <tr><td>지급 조정</td><td>수입대금 결제</td><td class="num">1.8억원</td><td class="red">상</td><td>지급일 조정 검토</td>
+            <td><select><option>선택</option><option>지급</option><option>연기</option></select></td></tr>
+          <tr><td>예산 승인</td><td>광고비 증액 요청</td><td class="num">3,000만원</td><td>중</td><td>ROI 확인 후 결정</td>
+            <td><select><option>선택</option><option>승인</option><option>반려</option></select></td></tr>
+          <tr><td>회수 조치</td><td>장기 미수 거래처</td><td class="num">7,500만원</td><td>중</td><td>법적 조치 검토</td>
+            <td><select><option>선택</option><option>독촉</option><option>법적조치</option></select></td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>주간 현금 추이 <span class="unit">단위: 억원</span></h3>
+        <div class="chart-box"><canvas id="chartWeekly"></canvas></div>
+      </div>
+    </section>
+
+    </div><!-- /요약 대시보드 페이지 -->
+
+    <!-- 나머지 메뉴 페이지 (지금은 '준비 중' 화면, 나중에 내용 채우기) -->
+    <div class="page" data-page="cash"><div class="placeholder"><h2>현금 현황</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+    <div class="page" data-page="in"><div class="placeholder"><h2>입금 관리</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+    <div class="page" data-page="out"><div class="placeholder"><h2>출금 관리</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+    <div class="page" data-page="forecast"><div class="placeholder"><h2>자금 예측</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+    <div class="page" data-page="ar"><div class="placeholder"><h2>매출채권(미수금)</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+    <div class="page" data-page="ap"><div class="placeholder"><h2>매입채무(미지급금)</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+    <div class="page" data-page="inv"><div class="placeholder"><h2>재고/발주/수입</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+    <div class="page" data-page="loan"><div class="placeholder"><h2>차입금/금융</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+    <div class="page" data-page="tax"><div class="placeholder"><h2>세금 관리</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+    <div class="page" data-page="alert"><div class="placeholder"><h2>이상 징후 알림</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+    <div class="page" data-page="report"><div class="placeholder"><h2>보고서/안건</h2><p>아직 준비 중인 페이지예요. 여기에 넣고 싶은 표·그래프·항목을 알려주시면 채워드릴게요.</p></div></div>
+
+    <div class="note">
+      표시된 금액·거래처는 모두 <b>연습용 가짜 데이터</b>입니다.
+      <b class="warn">실제 자금 데이터·계좌·거래처 정보는 깃허브(공개 페이지)에 올리지 마세요.</b><br />
+      숫자를 바꾸려면 위 카드·표의 글자를 직접 고치고, 그래프 숫자는 아래 코드의 각 차트 부분을 수정하면 됩니다.
+    </div>
+
+  </main>
+</div>
+
+<script>
+/* ── 오늘 날짜 / 현재 시각 자동 표시 ── */
+function 시각표시(){
+  const now = new Date();
+  const 요일 = ['일','월','화','수','목','금','토'][now.getDay()];
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const dd = String(now.getDate()).padStart(2,'0');
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mi = String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('reportDate').textContent = `${yyyy}.${mm}.${dd} (${요일})`;
+  document.getElementById('updateTime').textContent = `${hh}:${mi}`;
+}
+시각표시();
+setInterval(시각표시, 60000); /* 1분마다 시각 갱신 */
+
+/* ── 왼쪽 메뉴 클릭 시 페이지 전환 ── */
+const 페이지제목 = {
+  summary:'일일 자금 대시보드', cash:'현금 현황', in:'입금 관리', out:'출금 관리',
+  forecast:'자금 예측', ar:'매출채권(미수금)', ap:'매입채무(미지급금)', inv:'재고/발주/수입',
+  loan:'차입금/금융', tax:'세금 관리', alert:'이상 징후 알림', report:'보고서/안건'
+};
+document.querySelectorAll('.nav a').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    const key = link.dataset.page;
+    document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+    link.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelector('.page[data-page="' + key + '"]').classList.add('active');
+    document.getElementById('pageTitle').textContent = 페이지제목[key];
+    window.scrollTo(0, 0);
+  });
+});
+
+Chart.defaults.font.family = "'Pretendard', sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = "#8A9892";
+const 억 = v => v + "억";
+
+/* 1) 현금 잔고 예측 */
+new Chart(document.getElementById('chartForecast'), {
+  type:'line',
+  data:{
+    labels:['05/22','05/29','06/05','06/12','06/19','06/26','07/03','07/10'],
+    datasets:[
+      { label:'실제 잔고', data:[28.4,26.5,24.0,21.5,19.0,17.5,null,null],
+        borderColor:'#6FC2A4', backgroundColor:'rgba(111,194,164,.10)', fill:true, tension:.3, pointRadius:2, borderWidth:2 },
+      { label:'예측 잔고', data:[null,null,null,null,null,17.5,12.0,9.0],
+        borderColor:'#B6C9C1', borderDash:[6,5], tension:.3, pointRadius:2, fill:false, borderWidth:2 },
+      { label:'안전 기준선(16억)', data:[16,16,16,16,16,16,16,16],
+        borderColor:'#E47C6E', borderDash:[3,4], borderWidth:1.5, pointRadius:0, fill:false }
+    ]
+  },
+  options:{ responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:12 } } },
+    scales:{ y:{ ticks:{ callback:억 }, grid:{ color:'#EEF4F1' } }, x:{ grid:{ display:false } } } }
+});
+
+/* 2) 금일 현금 흐름 (워터폴) */
+new Chart(document.getElementById('chartFlow'), {
+  type:'bar',
+  data:{
+    labels:['전일 잔고','입금','출금','금일 잔고'],
+    datasets:[{
+      data:[[0,30.0],[30.0,33.2],[28.4,33.2],[0,28.4]],
+      backgroundColor:['#C2E6D9','#5FB79A','#E47C6E','#4FAE8C'],
+      borderRadius:4, barPercentage:.62
+    }]
+  },
+  options:{ responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false },
+      tooltip:{ callbacks:{ label:c => (Math.abs(c.raw[1]-c.raw[0])).toFixed(1)+'억' } } },
+    scales:{ y:{ ticks:{ callback:억 }, grid:{ color:'#EEF4F1' } }, x:{ grid:{ display:false } } } }
+});
+
+/* 3) 미수금 현황 (도넛) */
+new Chart(document.getElementById('chartAR'), {
+  type:'doughnut',
+  data:{ labels:['30일 이내','30~60일','60~90일','90일 초과'],
+    datasets:[{ data:[9.8,4.6,2.7,1.4], backgroundColor:['#5FB79A','#8FD0BB','#C2E6D9','#E47C6E'], borderWidth:0 }] },
+  options:{ responsive:true, maintainAspectRatio:false, cutout:'60%',
+    plugins:{ legend:{ position:'right', labels:{ boxWidth:9, padding:6, font:{ size:10 } } } } }
+});
+
+/* 4) 미지급금 현황 (도넛) */
+new Chart(document.getElementById('chartAP'), {
+  type:'doughnut',
+  data:{ labels:['30일 이내','30~60일','60일 초과'],
+    datasets:[{ data:[18.0,5.0,2.3], backgroundColor:['#5FB79A','#9AD6C2','#F0C674'], borderWidth:0 }] },
+  options:{ responsive:true, maintainAspectRatio:false, cutout:'60%',
+    plugins:{ legend:{ position:'right', labels:{ boxWidth:9, padding:6, font:{ size:10 } } } } }
+});
+
+/* 5) 주간 현금 추이 (막대+선) */
+new Chart(document.getElementById('chartWeekly'), {
+  data:{
+    labels:['1주','2주','3주','4주','5주','6주'],
+    datasets:[
+      { type:'bar', label:'입금', data:[18.2,16.7,21.0,20.1,24.6,23.2], backgroundColor:'#5FB79A', barPercentage:.55, categoryPercentage:.6 },
+      { type:'bar', label:'출금', data:[15.0,17.5,18.0,19.5,20.4,22.0], backgroundColor:'#E47C6E', barPercentage:.55, categoryPercentage:.6 },
+      { type:'line', label:'순현금흐름', data:[3.2,-0.8,3.0,0.6,4.2,1.2], borderColor:'#5C6B64', borderWidth:2, tension:.3, pointRadius:3 }
+    ]
+  },
+  options:{ responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:12 } } },
+    scales:{ y:{ ticks:{ callback:억 }, grid:{ color:'#EEF4F1' } }, x:{ grid:{ display:false } } } }
+});
+</script>
+</body>
+</html>
