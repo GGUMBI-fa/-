@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>자금현황 · 은행별 현재 잔고</title>
+
+<!-- 글꼴 (인터넷 연결 시 자동으로 예쁜 글꼴이 적용됩니다) -->
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    --ink:      #0F1B2D;   /* 진한 남색 (제목/글자) */
+    --surface:  #F4F6F9;   /* 배경 */
+    --panel:    #FFFFFF;   /* 카드 */
+    --accent:   #0E7C66;   /* 잔고 강조 (신뢰감 있는 진초록) */
+    --accent-soft:#E4F0EC; /* 막대 배경 */
+    --muted:    #6B7785;   /* 보조 글자 */
+    --hairline: #E6E9EF;   /* 얇은 선 */
+    --low:      #B4541E;   /* 잔고 적을 때 표시 색 */
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  body{
+    font-family:'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    background:var(--surface);
+    color:var(--ink);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding:clamp(20px, 5vw, 56px);
+  }
+
+  .wrap{ max-width:980px; margin:0 auto; }
+
+  /* ── 머리말 ───────────────────────── */
+  .eyebrow{
+    font-size:13px; font-weight:600; letter-spacing:.14em;
+    color:var(--accent); text-transform:uppercase;
+  }
+  h1{
+    font-size:clamp(26px, 4vw, 36px); font-weight:700;
+    letter-spacing:-.01em; margin:6px 0 0;
+  }
+  .asof{ color:var(--muted); font-size:14px; margin-top:8px; }
+
+  /* ── 합계(히어로) ─────────────────── */
+  .total{
+    margin:34px 0 30px; padding:28px 30px;
+    background:var(--ink); color:#fff;
+    border-radius:18px;
+    display:flex; flex-wrap:wrap; align-items:flex-end;
+    justify-content:space-between; gap:16px;
+  }
+  .total .label{ font-size:14px; color:#A9B6C6; font-weight:500; }
+  .total .sum{
+    font-family:'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:clamp(32px, 6vw, 52px); font-weight:600;
+    letter-spacing:-.02em; margin-top:6px;
+    /* 회계 장부의 "합계 이중선" 느낌 */
+    border-bottom:3px double rgba(255,255,255,.45);
+    padding-bottom:8px; display:inline-block;
+  }
+  .total .meta{ text-align:right; font-size:13px; color:#A9B6C6; }
+  .total .meta b{ color:#fff; font-weight:600; font-size:22px; display:block; }
+
+  /* ── 은행 카드 ───────────────────── */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(248px, 1fr));
+    gap:16px;
+  }
+  .card{
+    background:var(--panel); border:1px solid var(--hairline);
+    border-radius:16px; padding:20px 20px 18px;
+    position:relative; overflow:hidden;
+    animation:rise .5s ease both;
+  }
+  .card::before{ /* 카드 위쪽 색 띠 */
+    content:''; position:absolute; inset:0 0 auto 0; height:4px;
+    background:var(--accent);
+  }
+  .bank{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .bank .name{ font-size:17px; font-weight:700; }
+  .tag{
+    font-size:11px; font-weight:600; color:var(--accent);
+    background:var(--accent-soft); padding:3px 9px; border-radius:999px;
+  }
+  .amount{
+    font-family:'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:25px; font-weight:600; letter-spacing:-.01em;
+  }
+  .amount.low{ color:var(--low); }
+
+  /* 전체 대비 비중 막대 (간단한 비교 그래프 역할) */
+  .barwrap{ margin-top:14px; }
+  .track{ height:7px; background:var(--accent-soft); border-radius:999px; overflow:hidden; }
+  .fill{ height:100%; background:var(--accent); border-radius:999px; width:0; transition:width .9s cubic-bezier(.22,1,.36,1); }
+  .barmeta{ display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-top:7px; }
+
+  /* ── 꼬리말 ───────────────────────── */
+  footer{
+    margin-top:34px; padding-top:18px; border-top:1px solid var(--hairline);
+    font-size:13px; color:var(--muted);
+  }
+  footer .warn{ color:var(--low); font-weight:600; }
+
+  @keyframes rise{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+  @media (prefers-reduced-motion:reduce){
+    .card{ animation:none; } .fill{ transition:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">자금현황</div>
+  <h1>은행별 현재 잔고</h1>
+  <p class="asof" id="asof"></p>
+
+  <section class="total">
+    <div>
+      <div class="label">총 보유 현금</div>
+      <div class="sum" id="totalSum">₩0</div>
+    </div>
+    <div class="meta">
+      거래 은행
+      <b id="bankCount">0개</b>
+    </div>
+  </section>
+
+  <section class="grid" id="grid"></section>
+
+  <footer>
+    표시된 금액은 모두 <b>연습용 가짜 데이터</b>입니다.
+    <span class="warn">실제 계좌번호·잔고·비밀번호는 절대 깃허브에 올리지 마세요.</span><br />
+    숫자를 바꾸려면 아래 코드의 "여기만 수정" 부분을 고치면 됩니다.
+  </footer>
+
+</div>
+
+<script>
+/* ══════════════════════════════════════════════
+   ▼▼▼  여기만 수정하세요  ▼▼▼
+   - 업데이트일: 화면 위쪽에 표시될 기준일
+   - 계좌목록: 은행 한 곳당 { } 한 줄.
+       은행 = 은행 이름
+       구분 = 계좌 용도(자유롭게)
+       잔액 = 금액 (숫자만, 쉼표 없이)
+   줄을 추가하거나 지워도 화면이 알아서 다시 그려집니다.
+═══════════════════════════════════════════════ */
+const 업데이트일 = "2026-06-29";
+
+const 계좌목록 = [
+  { 은행: "국민은행", 구분: "주거래",       잔액: 482000000 },
+  { 은행: "신한은행", 구분: "운영자금",     잔액: 215400000 },
+  { 은행: "하나은행", 구분: "예비비",       잔액: 153200000 },
+  { 은행: "우리은행", 구분: "급여계좌",     잔액:  96800000 },
+  { 은행: "기업은행", 구분: "법인카드 결제", 잔액:  41250000 },
+];
+/* ▲▲▲  여기까지만 수정  ▲▲▲ */
+
+
+/* ── 아래는 화면을 그리는 코드 (건드리지 않아도 됩니다) ── */
+const won = n => "₩" + n.toLocaleString("ko-KR");
+
+function render(){
+  const 정렬 = [...계좌목록].sort((a,b) => b.잔액 - a.잔액);
+  const 합계 = 정렬.reduce((s,r) => s + r.잔액, 0);
+  const 최대 = 정렬[0] ? 정렬[0].잔액 : 0;
+
+  document.getElementById("asof").textContent = "기준일 " + 업데이트일;
+  document.getElementById("totalSum").textContent = won(합계);
+  document.getElementById("bankCount").textContent = 정렬.length + "개";
+
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
+  정렬.forEach((r, i) => {
+    const 비중전체 = 합계 ? Math.round(r.잔액 / 합계 * 100) : 0;  // 전체 현금 중 차지하는 %
+    const 막대길이 = 최대 ? (r.잔액 / 최대 * 100) : 0;            // 가장 큰 곳 대비 막대 길이
+    const 잔고적음 = r.잔액 < 합계 * 0.1;                          // 전체의 10% 미만이면 표시
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.animationDelay = (i * 0.06) + "s";
+    card.innerHTML = `
+      <div class="bank">
+        <span class="name">${r.은행}</span>
+        <span class="tag">${r.구분}</span>
+      </div>
+      <div class="amount ${잔고적음 ? "low" : ""}">${won(r.잔액)}</div>
+      <div class="barwrap">
+        <div class="track"><div class="fill" data-w="${막대길이}"></div></div>
+        <div class="barmeta"><span>전체 대비</span><span>${비중전체}%</span></div>
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  // 막대 애니메이션
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".fill").forEach(el => el.style.width = el.dataset.w + "%");
+  });
+}
+
+render();
+</script>
+</body>
+</html>
