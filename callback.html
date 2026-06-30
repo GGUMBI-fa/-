@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>오픈뱅킹 인증 콜백</title>
+<style>
+  body{ font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif; background:#F7FBF9; color:#2C3A35; padding:40px; }
+  .box{ max-width:520px; margin:0 auto; background:#fff; border:1px solid #EAF0ED; border-radius:12px; padding:24px; }
+  h2{ margin-bottom:12px; font-size:18px; }
+  .label{ font-size:12px; color:#8A9892; margin-top:14px; }
+  .value{ font-size:14px; font-weight:600; word-break:break-all; background:#F2F8F5; padding:10px; border-radius:8px; margin-top:4px; }
+  .copy-btn{ margin-top:10px; padding:8px 14px; border:none; border-radius:8px; background:#34423D; color:#fff; cursor:pointer; font-size:12px; }
+  .empty{ color:#E47C6E; font-size:13px; margin-top:10px; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h2>오픈뱅킹 인증 콜백</h2>
+    <div id="result"></div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  const error = params.get('error');
+  const resultEl = document.getElementById('result');
+
+  if (error) {
+    resultEl.innerHTML = `<div class="empty">인증 실패: ${error}</div>`;
+  } else if (code) {
+    resultEl.innerHTML = `
+      <div class="label">인증코드 (code)</div>
+      <div class="value" id="codeValue">${code}</div>
+      <button class="copy-btn" onclick="navigator.clipboard.writeText('${code}')">코드 복사</button>
+      ${state ? `<div class="label">state</div><div class="value">${state}</div>` : ''}
+      <div class="label" style="margin-top:18px">다음 단계</div>
+      <div style="font-size:13px;color:#5C6B64;margin-top:4px">
+        위 코드를 복사해서 Postman으로 토큰 발급(POST /oauth/2.0/token) 요청의 <b>code</b> 파라미터에 넣어주세요.
+        이 코드는 보통 짧은 시간(몇 분) 안에 만료되니 바로 사용해야 해요.
+      </div>
+    `;
+  } else {
+    resultEl.innerHTML = `<div class="empty">code 값이 없습니다. 오픈뱅킹 인증 URL을 통해 들어오셨는지 확인해주세요.</div>`;
+  }
+</script>
+</body>
+</html>
